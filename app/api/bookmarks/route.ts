@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/db'
+import prisma, { prismaRaw } from '@/lib/db'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_LIMIT = 24
@@ -76,9 +76,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // Only the Other tab may see Other rows; everything else goes through the filtered client
+  const db = source === 'other' ? prismaRaw : prisma
+
   try {
     const [bookmarks, total] = await Promise.all([
-      prisma.bookmark.findMany({
+      db.bookmark.findMany({
         where,
         skip,
         take: limit,
@@ -99,7 +102,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           },
         },
       }),
-      prisma.bookmark.count({ where }),
+      db.bookmark.count({ where }),
     ])
 
     const formatted = bookmarks.map((bookmark) => ({
