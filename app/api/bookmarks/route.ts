@@ -46,8 +46,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const where: Record<string, unknown> = {}
 
-  if (source === 'bookmark' || source === 'like') {
+  if (source === 'other') {
+    // "Other" tab: tweets imported as other, plus any tweet with a locally stored video
+    where.OR = [{ source: 'other' }, { mediaItems: { some: { localPath: { not: null } } } }]
+  } else if (source === 'bookmark' || source === 'like') {
     where.source = source
+  } else {
+    // Main library never shows the Other collection
+    where.source = { not: 'other' }
   }
 
   if (q) {
@@ -110,6 +116,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         type: m.type,
         url: m.url,
         thumbnailUrl: m.thumbnailUrl,
+        localPath: m.localPath,
       })),
       categories: bookmark.categories.map((bc) => ({
         id: bc.category.id,
@@ -125,6 +132,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       total,
       page,
       limit,
+      mediaBase: (process.env.OTHER_MEDIA_BASE_URL ?? 'http://localhost:3100').replace(/\/$/, ''),
     })
   } catch (err) {
     console.error('Bookmarks fetch error:', err)

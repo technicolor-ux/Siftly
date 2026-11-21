@@ -4,6 +4,7 @@ export interface MediaItem {
   url: string
   thumbnailUrl: string | null
   imageTags?: string | null
+  localPath?: string | null
 }
 
 export interface BookmarkCategory {
@@ -24,6 +25,7 @@ export interface BookmarkWithMedia {
   importedAt?: string
   mediaItems: MediaItem[]
   categories: BookmarkCategory[]
+  source?: string
 }
 
 export interface Category {
@@ -50,4 +52,5 @@ export interface BookmarksResponse {
   total: number
   page: number
   limit: number
+  mediaBase?: string
 }
