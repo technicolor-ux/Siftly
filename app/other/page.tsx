@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, X, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, X, ArrowUpDown } from 'lucide-react'
 import OtherCard from '@/components/other-card'
 import type { BookmarkWithMedia, BookmarksResponse } from '@/lib/types'
 
@@ -11,47 +11,77 @@ export default function OtherPage() {
   const [bookmarks, setBookmarks] = useState<BookmarkWithMedia[]>([])
   const [total, setTotal] = useState(0)
   const [mediaBase, setMediaBase] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true) // first page of a new query
+  const [loadingMore, setLoadingMore] = useState(false)
   const [q, setQ] = useState('')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
-  const [page, setPage] = useState(1)
+  const nextPage = useRef(1)
+  const hasMore = useRef(true)
+  const busy = useRef(false)
+  const generation = useRef(0) // bumped on every new query so stale responses are dropped
+  const sentinel = useRef<HTMLDivElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const loadMore = useCallback(async () => {
+    if (busy.current || !hasMore.current) return
+    busy.current = true
+    const gen = generation.current
+    const page = nextPage.current
+    if (page > 1) setLoadingMore(true)
     try {
       const params = new URLSearchParams({ source: 'other', sort, page: String(page), limit: String(PAGE_SIZE) })
       if (query) params.set('q', query)
       const res = await fetch(`/api/bookmarks?${params}`)
       if (!res.ok) throw new Error('Failed to fetch')
       const data: BookmarksResponse = await res.json()
-      setBookmarks(data.bookmarks)
+      if (gen !== generation.current) return
+      setBookmarks((prev) => {
+        const seen = new Set(prev.map((b) => b.id))
+        return [...prev, ...data.bookmarks.filter((b) => !seen.has(b.id))]
+      })
       setTotal(data.total)
       if (data.mediaBase) setMediaBase(data.mediaBase)
+      nextPage.current = page + 1
+      hasMore.current = page * PAGE_SIZE < data.total
     } catch (err) {
       console.error(err)
-      setBookmarks([])
-      setTotal(0)
+      hasMore.current = false
     } finally {
-      setLoading(false)
+      if (gen === generation.current) {
+        setLoading(false)
+        setLoadingMore(false)
+      }
+      busy.current = false
     }
-  }, [query, sort, page])
+  }, [query, sort])
 
+  // New query or sort: start over from the first page
   useEffect(() => {
-    load()
-  }, [load])
+    generation.current++
+    nextPage.current = 1
+    hasMore.current = true
+    busy.current = false
+    setBookmarks([])
+    setTotal(0)
+    setLoading(true)
+    loadMore()
+  }, [loadMore])
+
+  // Load the next page when the bottom of the list nears the screen
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && loadMore(), { rootMargin: '1200px 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [loadMore])
 
   function onSearch(value: string) {
     setQ(value)
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      setQuery(value.trim())
-      setPage(1)
-    }, 300)
+    timer.current = setTimeout(() => setQuery(value.trim()), 300)
   }
-
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
     <div className="flex flex-col h-full">
@@ -81,10 +111,7 @@ export default function OtherPage() {
               <span className="hidden sm:inline text-zinc-500">Sort</span>
               <select
                 value={sort}
-                onChange={(e) => {
-                  setSort(e.target.value as 'newest' | 'oldest')
-                  setPage(1)
-                }}
+                onChange={(e) => setSort(e.target.value as 'newest' | 'oldest')}
                 aria-label="Sort by date posted"
                 className="bg-transparent text-zinc-200 focus:outline-none cursor-pointer"
               >
@@ -129,28 +156,11 @@ export default function OtherPage() {
           </div>
         )}
 
-        {!loading && pages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-8">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 disabled:opacity-30 hover:text-zinc-200"
-              aria-label="Previous page"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-zinc-500 tabular-nums">
-              {page} / {pages}
-            </span>
-            <button
-              disabled={page >= pages}
-              onClick={() => setPage((p) => p + 1)}
-              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 disabled:opacity-30 hover:text-zinc-200"
-              aria-label="Next page"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+        {/* Infinite scroll trigger */}
+        <div ref={sentinel} className="h-px" />
+        {loadingMore && <p className="text-center text-xs text-zinc-600 py-6">Loading more...</p>}
+        {!loading && !loadingMore && bookmarks.length > 0 && bookmarks.length >= total && (
+          <p className="text-center text-xs text-zinc-700 py-8">End of list</p>
         )}
       </div>
     </div>

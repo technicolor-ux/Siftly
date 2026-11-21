@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Volume2, VolumeX, ExternalLink, HardDriveDownload, Play, Pause, RotateCcw, RotateCw } from 'lucide-react'
+import { Volume2, VolumeX, ExternalLink, HardDriveDownload, Play, Pause, RotateCcw, RotateCw, Maximize, Minimize } from 'lucide-react'
 import type { BookmarkWithMedia } from '@/lib/types'
 
 interface OtherCardProps {
@@ -25,7 +25,27 @@ function fmt(t: number): string {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function requestFs(wrap: HTMLElement, video: HTMLVideoElement | null) {
+  const w = wrap as any
+  if (w.requestFullscreen) w.requestFullscreen().catch(() => {})
+  else if (w.webkitRequestFullscreen) w.webkitRequestFullscreen()
+  else if (video && (video as any).webkitEnterFullscreen) (video as any).webkitEnterFullscreen() // iPhone
+}
+
+function exitFs() {
+  const d = document as any
+  if (d.exitFullscreen) d.exitFullscreen().catch(() => {})
+  else if (d.webkitExitFullscreen) d.webkitExitFullscreen()
+}
+
+function currentFsElement(): Element | null {
+  const d = document as any
+  return d.fullscreenElement ?? d.webkitFullscreenElement ?? null
+}
+
 function LocalVideo({ src }: { src: string }) {
+  const wrapRef = useRef<HTMLDivElement>(null)
   const ref = useRef<HTMLVideoElement>(null)
   const [muted, setMuted] = useState(true)
   const [ratio, setRatio] = useState<number | null>(null)
@@ -33,20 +53,55 @@ function LocalVideo({ src }: { src: string }) {
   const [playing, setPlaying] = useState(false)
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [near, setNear] = useState(false) // within ~1.5 screens: video data is loaded
+  const [visible, setVisible] = useState(false) // mostly on screen: video plays
+  const [isFs, setIsFs] = useState(false)
 
-  // Play only while on screen so a page of videos never loads or plays at once
+  // Two observers: "near" loads the video, "visible" plays it. Far away, the video is
+  // unloaded entirely so a long list never holds hundreds of videos in memory.
   useEffect(() => {
-    const el = ref.current
+    const el = wrapRef.current
     if (!el) return
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) el.play().catch(() => {})
-        else el.pause()
-      },
-      { threshold: 0.5 },
-    )
-    io.observe(el)
-    return () => io.disconnect()
+    const nearIo = new IntersectionObserver(([e]) => setNear(e.isIntersecting), { rootMargin: '150% 0px' })
+    const visIo = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.5 })
+    nearIo.observe(el)
+    visIo.observe(el)
+    return () => {
+      nearIo.disconnect()
+      visIo.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    const v = ref.current
+    if (!v) return
+    const url = `${src}#t=0.1`
+    if (near) {
+      if (v.getAttribute('src') !== url) v.src = url
+    } else if (v.getAttribute('src')) {
+      v.pause()
+      v.removeAttribute('src')
+      v.load() // releases the decoded media
+      setPlaying(false)
+      setTime(0)
+    }
+  }, [near, src])
+
+  useEffect(() => {
+    const v = ref.current
+    if (!v || !near) return
+    if (visible || isFs) v.play().catch(() => {})
+    else v.pause()
+  }, [visible, near, isFs])
+
+  useEffect(() => {
+    const onChange = () => setIsFs(currentFsElement() === wrapRef.current)
+    document.addEventListener('fullscreenchange', onChange)
+    document.addEventListener('webkitfullscreenchange', onChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      document.removeEventListener('webkitfullscreenchange', onChange)
+    }
   }, [])
 
   const toggle = () => {
@@ -59,6 +114,10 @@ function LocalVideo({ src }: { src: string }) {
     const v = ref.current
     if (!v) return
     v.currentTime = Math.min(Math.max(v.currentTime + delta, 0), v.duration || 0)
+  }
+  const toggleFs = () => {
+    if (isFs) exitFs()
+    else if (wrapRef.current) requestFs(wrapRef.current, ref.current)
   }
 
   if (failed) {
@@ -74,12 +133,12 @@ function LocalVideo({ src }: { src: string }) {
 
   return (
     <div
+      ref={wrapRef}
       className="group relative flex-1 bg-black min-h-40"
-      style={{ aspectRatio: ratio ?? 9 / 16, maxHeight: '75vh' }}
+      style={isFs ? undefined : { aspectRatio: ratio ?? 9 / 16, maxHeight: '75vh' }}
     >
       <video
         ref={ref}
-        src={`${src}#t=0.1`}
         muted={muted}
         loop
         playsInline
@@ -88,12 +147,17 @@ function LocalVideo({ src }: { src: string }) {
           const v = e.currentTarget
           setDuration(v.duration)
           if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight)
+          if (visible) v.play().catch(() => {})
         }}
         onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onError={() => setFailed(true)}
+        onError={(e) => {
+          // an unloaded video (no src) also fires nothing here; only real load failures count
+          if (e.currentTarget.getAttribute('src')) setFailed(true)
+        }}
         onClick={toggle}
+        onDoubleClick={toggleFs}
         className="absolute inset-0 w-full h-full object-contain cursor-pointer"
       />
       <div
@@ -133,6 +197,9 @@ function LocalVideo({ src }: { src: string }) {
             className={`${btn} ml-auto`}
           >
             {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
+          <button onClick={toggleFs} aria-label={isFs ? 'Exit full screen' : 'Full screen'} className={btn}>
+            {isFs ? <Minimize size={15} /> : <Maximize size={15} />}
           </button>
         </div>
       </div>
