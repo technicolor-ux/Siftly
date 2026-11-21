@@ -76,16 +76,22 @@ export default function OtherPage() {
                 </button>
               )}
             </div>
-            <button
-              onClick={() => {
-                setSort((s) => (s === 'newest' ? 'oldest' : 'newest'))
-                setPage(1)
-              }}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all shrink-0"
-            >
+            <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 shrink-0 focus-within:border-indigo-500/60">
               <ArrowUpDown size={13} />
-              <span className="hidden sm:inline">{sort === 'newest' ? 'Newest first' : 'Oldest first'}</span>
-            </button>
+              <span className="hidden sm:inline text-zinc-500">Sort</span>
+              <select
+                value={sort}
+                onChange={(e) => {
+                  setSort(e.target.value as 'newest' | 'oldest')
+                  setPage(1)
+                }}
+                aria-label="Sort by date posted"
+                className="bg-transparent text-zinc-200 focus:outline-none cursor-pointer"
+              >
+                <option value="newest" className="bg-zinc-900">Date posted: newest</option>
+                <option value="oldest" className="bg-zinc-900">Date posted: oldest</option>
+              </select>
+            </label>
           </div>
         </div>
       </div>
