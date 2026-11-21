@@ -135,7 +135,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       total,
       page,
       limit,
-      mediaBase: (process.env.OTHER_MEDIA_BASE_URL ?? 'http://localhost:3100').replace(/\/$/, ''),
+      // Videos are streamed through Siftly itself (see /api/other-media)
+      mediaBase: '/api/other-media',
     })
   } catch (err) {
     console.error('Bookmarks fetch error:', err)

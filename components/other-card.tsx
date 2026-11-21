@@ -79,7 +79,7 @@ function LocalVideo({ src }: { src: string }) {
     >
       <video
         ref={ref}
-        src={src}
+        src={`${src}#t=0.1`}
         muted={muted}
         loop
         playsInline
