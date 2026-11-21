@@ -38,15 +38,13 @@ function SponsorFooter() {
   return (
     <div className="mx-3 mt-auto mb-3 pt-3 border-t border-zinc-800/50 space-y-2">
       {/* Builder credit */}
-      <a
-        href={BUILDER_X}
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        href="/other"
         className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
       >
         <span className="text-[13px]">&#x1D54F;</span>
         <span className="text-[11px] font-medium">Built by @viperr</span>
-      </a>
+      </Link>
 
       {/* Sponsor spot */}
       <a
