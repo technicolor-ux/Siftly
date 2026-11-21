@@ -19,7 +19,6 @@ import {
 import * as Select from '@radix-ui/react-select'
 import BookmarkCard from '@/components/bookmark-card'
 import BookmarkRow from '@/components/bookmark-row'
-import OtherCard from '@/components/other-card'
 import BookmarkDetailModal from '@/components/bookmark-detail-modal'
 import type { BookmarkWithMedia, BookmarksResponse } from '@/lib/types'
 
@@ -215,7 +214,6 @@ function BookmarksPageInner() {
   const [searchInput, setSearchInput] = useState('')
   const [bookmarks, setBookmarks] = useState<BookmarkWithMedia[]>([])
   const [total, setTotal] = useState(0)
-  const [mediaBase, setMediaBase] = useState('')
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact'>('grid')
   const [openBookmark, setOpenBookmark] = useState<BookmarkWithMedia | null>(null)
@@ -229,7 +227,6 @@ function BookmarksPageInner() {
       const data: BookmarksResponse = await res.json()
       setBookmarks(data.bookmarks)
       setTotal(data.total)
-      if (data.mediaBase) setMediaBase(data.mediaBase)
     } catch (err) {
       console.error(err)
       setBookmarks([])
@@ -239,7 +236,7 @@ function BookmarksPageInner() {
     }
   }, [])
 
-  const pageSize = viewMode === 'compact' && filters.source !== 'other' ? COMPACT_PAGE_SIZE : DEFAULT_PAGE_SIZE
+  const pageSize = viewMode === 'compact' ? COMPACT_PAGE_SIZE : DEFAULT_PAGE_SIZE
 
   useEffect(() => {
     fetchBookmarks(filters, pageSize)
@@ -282,9 +279,7 @@ function BookmarksPageInner() {
     { label: 'Oldest first', value: 'oldest' },
   ]
 
-  const isOther = filters.source === 'other'
-
-  const hasActiveFilters = !!(filters.q || filters.category || filters.mediaType || (filters.source && !isOther) || filters.sort !== 'newest' || filters.uncategorized)
+  const hasActiveFilters = !!(filters.q || filters.category || filters.mediaType || filters.source || filters.sort !== 'newest' || filters.uncategorized)
 
   const sortLabel = sortOptions.find((o) => o.value === filters.sort)?.label ?? 'Newest first'
 
@@ -294,23 +289,6 @@ function BookmarksPageInner() {
       {/* ── Sticky top bar ── */}
       <div className="sticky top-0 z-20 bg-zinc-950/90 backdrop-blur-lg border-b border-zinc-800/60">
         <div className="px-6 md:px-8 py-4">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 mb-3">
-            {[{ label: 'Library', value: '' }, { label: 'Other', value: 'other' }].map((t) => {
-              const active = t.value === 'other' ? isOther : !isOther
-              return (
-                <button
-                  key={t.label}
-                  onClick={() => setFilters((prev) => ({ ...prev, source: t.value, mediaType: '', page: 1 }))}
-                  className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    active ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              )
-            })}
-          </div>
           <div className="flex items-center gap-3">
 
             {/* Search */}
@@ -334,22 +312,20 @@ function BookmarksPageInner() {
             </div>
 
             {/* Filters */}
-            {!isOther && (
-              <>
-                <SelectMenu
-                  value={filters.mediaType}
-                  onChange={(v) => updateFilter('mediaType', v)}
-                  options={mediaOptions}
-                  placeholder="All media"
-                />
-                <SelectMenu
-                  value={filters.source}
-                  onChange={(v) => updateFilter('source', v)}
-                  options={sourceOptions}
-                  placeholder="All sources"
-                />
-              </>
-            )}
+            <SelectMenu
+              value={filters.mediaType}
+              onChange={(v) => updateFilter('mediaType', v)}
+              options={mediaOptions}
+              placeholder="All media"
+            />
+
+            {/* Source */}
+            <SelectMenu
+              value={filters.source}
+              onChange={(v) => updateFilter('source', v)}
+              options={sourceOptions}
+              placeholder="All sources"
+            />
 
             {/* Sort */}
             <button
@@ -362,7 +338,7 @@ function BookmarksPageInner() {
             </button>
 
             {/* View toggle */}
-            {!isOther && <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-xl p-1 shrink-0">
+            <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-xl p-1 shrink-0">
               <button
                 onClick={() => handleSetViewMode('grid')}
                 className={`p-1.5 rounded-lg transition-all ${
@@ -390,7 +366,7 @@ function BookmarksPageInner() {
               >
                 <AlignJustify size={14} />
               </button>
-            </div>}
+            </div>
 
           </div>
 
@@ -415,7 +391,7 @@ function BookmarksPageInner() {
                   <button onClick={() => updateFilter('mediaType', '')} className="text-indigo-400 hover:text-indigo-200 transition-colors"><X size={10} /></button>
                 </span>
               )}
-              {filters.source && !isOther && (
+              {filters.source && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium">
                   {sourceOptions.find((o) => o.value === filters.source)?.label}
                   <button onClick={() => updateFilter('source', '')} className="text-indigo-400 hover:text-indigo-200 transition-colors"><X size={10} /></button>
@@ -484,19 +460,8 @@ function BookmarksPageInner() {
           </div>
         )}
 
-        {/* Other tab: video-first grid */}
-        {!loading && bookmarks.length > 0 && isOther && (
-          <div className="masonry-grid">
-            {bookmarks.map((bookmark) => (
-              <div key={bookmark.id} className="masonry-item">
-                <OtherCard bookmark={bookmark} mediaBase={mediaBase} />
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Masonry grid */}
-        {!loading && bookmarks.length > 0 && !isOther && viewMode === 'grid' && (
+        {!loading && bookmarks.length > 0 && viewMode === 'grid' && (
           <div className="masonry-grid">
             {bookmarks.map((bookmark) => (
               <div key={bookmark.id} className="masonry-item">
@@ -507,7 +472,7 @@ function BookmarksPageInner() {
         )}
 
         {/* List view */}
-        {!loading && bookmarks.length > 0 && !isOther && viewMode === 'list' && (
+        {!loading && bookmarks.length > 0 && viewMode === 'list' && (
           <div className="flex flex-col gap-3 max-w-3xl mx-auto">
             {bookmarks.map((bookmark) => (
               <BookmarkCard key={bookmark.id} bookmark={bookmark} />
@@ -516,7 +481,7 @@ function BookmarksPageInner() {
         )}
 
         {/* Compact view */}
-        {!loading && bookmarks.length > 0 && !isOther && viewMode === 'compact' && (
+        {!loading && bookmarks.length > 0 && viewMode === 'compact' && (
           <div className="flex flex-col divide-y divide-zinc-800/50 border border-zinc-800 rounded-2xl overflow-hidden max-w-5xl mx-auto">
             {bookmarks.map((bookmark) => (
               <BookmarkRow key={bookmark.id} bookmark={bookmark} onClick={setOpenBookmark} />
