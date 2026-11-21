@@ -486,7 +486,7 @@ function BookmarksPageInner() {
 
         {/* Other tab: video-first grid */}
         {!loading && bookmarks.length > 0 && isOther && (
-          <div className="masonry-grid items-start">
+          <div className="masonry-grid">
             {bookmarks.map((bookmark) => (
               <div key={bookmark.id} className="masonry-item">
                 <OtherCard bookmark={bookmark} mediaBase={mediaBase} />
