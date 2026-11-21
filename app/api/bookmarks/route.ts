@@ -11,25 +11,6 @@ function parseIntParam(value: string | null, defaultValue: number): number {
   return isNaN(parsed) || parsed < 1 ? defaultValue : parsed
 }
 
-export async function DELETE(): Promise<NextResponse> {
-  try {
-    // Delete media items and category links first (cascade), then bookmarks
-    await prisma.$transaction([
-      prisma.bookmarkCategory.deleteMany({}),
-      prisma.mediaItem.deleteMany({}),
-      prisma.bookmark.deleteMany({}),
-      prisma.category.deleteMany({}),
-    ])
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error('Clear bookmarks error:', err)
-    return NextResponse.json(
-      { error: `Failed to clear bookmarks: ${err instanceof Error ? err.message : String(err)}` },
-      { status: 500 }
-    )
-  }
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url)
 

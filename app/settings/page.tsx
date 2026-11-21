@@ -985,81 +985,6 @@ function DataSection() {
   )
 }
 
-function DangerZoneSection({ onToast }: { onToast: (t: Toast) => void }) {
-  const [confirming, setConfirming] = useState(false)
-  const [clearing, setClearing] = useState(false)
-  const [cleared, setCleared] = useState(false)
-
-  async function handleClearAll() {
-    setClearing(true)
-    try {
-      const res = await fetch('/api/bookmarks', { method: 'DELETE' })
-      if (!res.ok) {
-        const data = await res.json() as { error?: string }
-        throw new Error(data.error ?? 'Failed to clear')
-      }
-      onToast({ type: 'success', message: 'All bookmarks deleted successfully' })
-      setConfirming(false)
-      setCleared(true)
-      setTimeout(() => setCleared(false), 3000)
-      window.dispatchEvent(new CustomEvent('siftly:cleared'))
-    } catch (err) {
-      onToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to clear bookmarks' })
-    } finally {
-      setClearing(false)
-    }
-  }
-
-  return (
-    <Section
-      icon={Shield}
-      title="Danger Zone"
-      description="Irreversible actions that affect all your data."
-      variant="danger"
-    >
-      <div className="flex items-center justify-between p-4 rounded-xl bg-red-900/20 border border-red-800/40">
-        <div>
-          <p className="text-sm font-medium text-zinc-300">Clear all bookmarks</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Permanently delete all imported bookmarks</p>
-        </div>
-        {cleared ? (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
-            <Check size={14} />
-            Cleared
-          </div>
-        ) : !confirming ? (
-          <button
-            onClick={() => setConfirming(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 bg-red-800/30 hover:bg-red-700/40 border border-red-700/50 hover:border-red-600/60 transition-all"
-          >
-            <Trash2 size={14} />
-            Clear all
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-400 mr-1">Are you sure?</span>
-            <button
-              onClick={() => setConfirming(false)}
-              disabled={clearing}
-              className="px-3 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => void handleClearAll()}
-              disabled={clearing}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Trash2 size={12} />
-              {clearing ? 'Deleting…' : 'Yes, delete all'}
-            </button>
-          </div>
-        )}
-      </div>
-    </Section>
-  )
-}
-
 const TECH_STACK = [
   { label: 'Next.js 15', color: 'bg-zinc-800 text-zinc-300 border-zinc-700' },
   { label: 'Prisma + SQLite', color: 'bg-zinc-800 text-zinc-300 border-zinc-700' },
@@ -1315,7 +1240,6 @@ export default function SettingsPage() {
         <XOAuthSection onToast={showToast} />
         <DataSection />
         <ObsidianExportBlock onToast={showToast} />
-        <DangerZoneSection onToast={showToast} />
         <AboutSection />
       </div>
     </div>
